@@ -1,0 +1,2 @@
+pulp>=3.0
+highspy>=1.7

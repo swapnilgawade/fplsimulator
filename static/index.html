@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FPL Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⚽</span>
+      <div>
+        <h1>FPL Simulator</h1>
+        <p class="sub" id="deadline">Loading data…</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="planner">Planner</button>
+      <button class="tab" data-tab="projections">Projections</button>
+      <button class="tab" data-tab="fixtures">Fixtures</button>
+    </nav>
+    <button class="ghost" id="refresh" title="Re-download all data from FPL">↻ Refresh data</button>
+  </header>
+
+  <main>
+    <!-- PLANNER -->
+    <section id="planner" class="panel active">
+      <div class="planner-grid">
+        <aside class="card side">
+          <h2>Your team</h2>
+          <label class="field">FPL team ID
+            <div class="row">
+              <input id="entry-id" inputmode="numeric" placeholder="e.g. 1234567">
+              <button id="load-team">Load</button>
+            </div>
+          </label>
+          <p class="hint">Find it in the URL of your Points page: fantasy.premierleague.com/entry/<b>1234567</b>/event/6</p>
+          <button class="ghost wide" id="scratch">…or build a squad from scratch (£100m)</button>
+
+          <div id="team-summary"></div>
+
+          <h2>Settings</h2>
+          <div class="settings">
+            <label class="field">Planning horizon
+              <select id="horizon"></select>
+            </label>
+            <label class="field">Max hits per GW
+              <select id="max-hits"><option>0</option><option selected>1</option><option>2</option></select>
+            </label>
+            <label class="field" title="Each transfer must beat this many points to be worth it. Higher = more conservative, keeps transfers rolling.">Transfer threshold (pts)
+              <input id="tr-penalty" type="number" step="0.1" min="0" value="0.5">
+            </label>
+            <label class="field" title="Weight on future gameweeks: projections get less reliable further out.">Future discount
+              <select id="decay"><option value="1">None</option><option value="0.95">Light (0.95)</option><option value="0.9" selected>Medium (0.9)</option><option value="0.8">Heavy (0.8)</option></select>
+            </label>
+            <label class="field" id="ft-field">Free transfers
+              <input id="ft" type="number" min="0" max="5" value="1">
+            </label>
+            <label class="field" id="bank-field">Bank (£m)
+              <input id="bank" type="number" step="0.1" value="0">
+            </label>
+          </div>
+
+          <h3>Chips</h3>
+          <div id="chips"></div>
+
+          <h3>Lock / ban players</h3>
+          <div class="row">
+            <input id="player-search" list="player-list" placeholder="Search player…">
+            <datalist id="player-list"></datalist>
+          </div>
+          <div class="row tight">
+            <button class="ghost small" id="add-lock">🔒 Lock</button>
+            <button class="ghost small" id="add-ban">🚫 Ban</button>
+          </div>
+          <div id="lock-ban"></div>
+
+          <button class="primary wide" id="run">Optimise transfers</button>
+        </aside>
+
+        <div class="results" id="results">
+          <div class="empty card">
+            <h2>Plan your next gameweeks</h2>
+            <p>Load your team with its ID, then press <b>Optimise transfers</b>. The solver looks several gameweeks ahead and picks the
+              transfers, starting XI and captain with the highest expected points. It accounts for free transfers you can roll, −4 hits,
+              your bank and real selling prices, the 3-per-club rule and any chips you plan.</p>
+            <ul class="how">
+              <li><b>Projections</b>: expected points for every player and gameweek, from recent xG/xA, minutes, defensive
+                contributions, saves and bonus, adjusted for each opponent's attack and defence.</li>
+              <li><b>Override minutes</b> on the Projections tab when you know something the model doesn't (rotation, a return from injury).</li>
+              <li><b>Fixtures</b>: a ticker of each team's expected goals and clean-sheet chances.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROJECTIONS -->
+    <section id="projections" class="panel">
+      <div class="card controls">
+        <input id="search" placeholder="Search player or team…">
+        <div class="seg" id="pos-filter">
+          <button class="on" data-pos="">All</button><button data-pos="GKP">GKP</button><button data-pos="DEF">DEF</button><button data-pos="MID">MID</button><button data-pos="FWD">FWD</button>
+        </div>
+        <select id="team-filter"><option value="">All teams</option></select>
+        <label class="inline">Max £<input id="max-price" type="number" step="0.5" min="3.5" max="16" value="16"></label>
+        <label class="inline">Total over
+          <select id="total-n"></select>
+        </label>
+        <button class="ghost small" id="clear-overrides" hidden>Clear minute overrides</button>
+      </div>
+      <div class="card table-wrap">
+        <table id="proj-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+        <button class="ghost wide" id="more" hidden>Show more</button>
+      </div>
+      <p class="hint pad">xMins: click to set your own expected minutes for a player. This feeds into projections and the planner.
+        Hover a GW cell to see where the points come from.</p>
+    </section>
+
+    <!-- FIXTURES -->
+    <section id="fixtures" class="panel">
+      <div class="card controls">
+        <div class="seg" id="fx-mode">
+          <button class="on" data-mode="attack">Attack (expected goals)</button><button data-mode="defence">Defence (clean sheet %)</button>
+        </div>
+        <label class="inline">Sort over next
+          <select id="fx-n"></select>
+        </label>
+      </div>
+      <div class="card table-wrap">
+        <table id="fx-table"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="card ratings">
+        <h3>Team ratings</h3>
+        <p class="hint">Attack: goals scored relative to an average team. Defence: goals conceded relative to average (lower is better). Fitted to
+          this season's xG and goals, weighted towards recent matches, with schedule strength taken into account.</p>
+        <div id="ratings"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" hidden></div>
+  <div id="loading" hidden><div class="spinner"></div><span id="loading-msg">Working…</span></div>
+  <script src="app.js"></script>
+</body>
+</html>
